@@ -1,0 +1,532 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS CloudFormation to provision an infrastructure with ALB, EC2 with Auto Scaling,
+  and DynamoDB for an application.
+
+Resources:
+  # Aqui você definirá seus recursos
+
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: MyVPC
+  
+  PublicSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.0.0/28
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: "us-east-1a"
+      Tags:
+        - Key: Name
+          Value: PublicSubnetOne
+
+  PublicSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.0.32/28
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: "us-east-1b"
+      Tags:
+        - Key: Name
+          Value: PublicSubnetTwo
+
+  MyInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref MyInternetGateway
+  
+  MyRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: MyRouteTable
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref MyRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref MyInternetGateway
+
+  SubnetRouteTableAssociationOne:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      RouteTableId: !Ref MyRouteTable
+
+  SubnetRouteTableAssociationTwo:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      RouteTableId: !Ref MyRouteTable
+  
+  MyNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref MyVPC
+  
+  InboundRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref MyNetworkAcl
+      RuleNumber: 100
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: 0
+        To: 65535
+  
+  OutboundRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref MyNetworkAcl
+      RuleNumber: 100
+      Protocol: -1  # All protocols
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: 0
+        To: 65535
+  
+  SubnetNetworkAclAssociationOne:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      NetworkAclId: !Ref MyNetworkAcl
+  
+  SubnetNetworkAclAssociationTwo:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      NetworkAclId: !Ref MyNetworkAcl
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for EC2 application instances
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 # Permite tráfego HTTP de qualquer lugar; ajuste conforme necessário
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0 # Substitua 0.0.0.0/0 pelo seu IP público para maior segurança
+        - IpProtocol: tcp
+          FromPort: 5050
+          ToPort: 5050
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0 # Permite todo o tráfego de saída
+      Tags:
+        - Key: Name
+          Value: InstanceSecurityGroup
+
+  EC2DynamoDBAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "DynamoDBAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "dynamodb:*"
+                Resource: "*"
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: EC2DynamoDBAccessRole
+
+  MyLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: ami-051f8a213df8bc089
+      InstanceType: t2.micro # Exemplo de tipo de instância
+      SecurityGroups:
+        - Ref: InstanceSecurityGroup
+      KeyName: arthurmt-newkey
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          exec > /var/log/user-data.log 2>&1
+          set -x
+
+          sudo yum update -y
+          sudo yum install -y python3 python3-devel
+          sudo yum install -y python3-pip
+          sudo yum install -y stress
+          sudo python3 -m pip install --upgrade pip
+          pip install boto3 jinja2
+
+          cd /home/ec2-user
+          mkdir scripts
+          cd scripts
+
+          cat <<EOF > index.html
+          <!DOCTYPE html>
+          <html lang="pt-br">
+          <head>
+              <meta charset="UTF-8">
+              <title>Welcome to my Web Application!</title> 
+              <link rel="stylesheet" type="text/css" href="style.css">
+          </head>
+          <body>
+              <div class="container">
+                  <h1>Welcome to my Web Application!</h1>
+                  <form action="/create_user" method="get">
+                      <label for="user">Username:</label>
+                      <input type="text" id="user" name="user" required>
+                      <input class="btn" type="submit" value="Create User">
+                  </form>
+                  <a class="btn" href="/list_users">Show users</a>
+                  <a class="btn" href="/start_stress">Start CPU Stress</a>
+                  <a class="btn" href="/stop_stress">Stop CPU Stress</a>
+              </div>
+          </body>
+          </html>
+
+          EOF
+
+          cat <<EOF > style.css
+          body {
+          font-family: Arial, sans-serif;
+          background-color: #f4f4f4;
+          margin: 0;
+          padding: 0;
+          }
+
+          .container {
+              width: 80%;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+              background-color: #fff;
+              border-radius: 10px;
+              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+          }
+
+          h1 {
+              text-align: center;
+              color: #333;
+          }
+
+          form {
+              display: flex;
+              flex-direction: column;
+              margin-bottom: 20px;
+          }
+
+          label {
+              margin-bottom: 5px;
+              color: #333;
+          }
+
+          input[type="text"] {
+              padding: 10px;
+              margin-bottom: 10px;
+              border: 1px solid #ccc;
+              border-radius: 5px;
+          }
+
+          .btn {
+              padding: 10px 15px;
+              background-color: #28a745;
+              color: #fff;
+              text-decoration: none;
+              border-radius: 5px;
+              text-align: center;
+              margin-top: 10px;
+              display: inline-block;
+          }
+
+          .btn:hover {
+              background-color: #218838;
+          }
+
+          ul {
+              list-style: none;
+              padding-left: 0;
+          }
+
+          ul li {
+              background-color: #f4f4f4;
+              padding: 10px;
+              margin-bottom: 5px;
+              border-radius: 5px;
+          }
+
+          a.btn {
+              display: block;
+              text-align: center;
+              margin-top: 10px;
+          }
+
+          EOF
+
+          cat <<EOF > dynamodb_app.py
+          import boto3
+          from jinja2 import Template
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+          from urllib.parse import urlparse, parse_qs
+          import subprocess
+
+          TABLE_NAME = "MyApplicationData"
+
+          class RequestHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path.startswith('/create_user'):
+                      query_components = parse_qs(urlparse(self.path).query)
+                      user_name = query_components.get('user', [''])[0]
+                      if user_name:
+                          self.create_user(user_name)
+                      self.send_response(302)
+                      self.send_header('Location', '/')
+                      self.end_headers()
+                  elif self.path.startswith('/list_users'):
+                      self.send_response(200)
+                      self.send_header('Content-type', 'text/html; charset=utf-8')
+                      self.end_headers()
+                      users_html = self.list_users()
+                      self.wfile.write(users_html.encode())
+                  elif self.path.startswith('/start_stress'):
+                      self.start_stress()
+                      self.send_response(302)
+                      self.send_header('Location', '/')
+                      self.end_headers()
+                  elif self.path.startswith('/stop_stress'):
+                      self.stop_stress()
+                      self.send_response(302)
+                      self.send_header('Location', '/')
+                      self.end_headers()
+                  else:
+                      self.send_response(200)
+                      self.send_header('Content-type', 'text/html; charset=utf-8')
+                      self.end_headers()
+                      with open('./index.html', 'r') as f:
+                          self.wfile.write(f.read().encode())
+
+              def create_user(self, user_name):
+                  dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+                  table = dynamodb.Table(TABLE_NAME)
+                  table.put_item(Item={'id': user_name})
+
+              def list_users(self):
+                  dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+                  table = dynamodb.Table(TABLE_NAME)
+                  response = table.scan()
+                  users = response.get('Items', [])
+                  template = Template("""
+                      <html>
+                      <head>
+                          <title>Database Users</title>
+                          <link rel='stylesheet' type='text/css' href='style.css'>
+                          <meta charset='utf-8'>
+                      </head>
+                      <body>
+                          <div class='container'>
+                              <h1>Database Users</h1>
+                              <ul>
+                              {% for user in users %}
+                                  <li>{{ user['id'] }}</li>
+                              {% endfor %}
+                              </ul>
+                              <a class='btn' href='/'>Back</a>
+                          </div>
+                      </body>
+                      </html>
+                  """)
+                  return template.render(users=users)
+
+              def start_stress(self):
+                  # Inicia o processo de stress
+                  subprocess.Popen(['stress', '--cpu', '4', '--timeout', '600'])
+
+              def stop_stress(self):
+                  # Encerra todos os processos de stress
+                  subprocess.call(['pkill', 'stress'])
+
+          if __name__ == '__main__':
+              server_address = ('', 5050)
+              httpd = HTTPServer(server_address, RequestHandler)
+              print('Starting server...')
+              httpd.serve_forever()
+
+          EOF
+
+          python3 /home/ec2-user/scripts/dynamodb_app.py &
+
+  MyAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref MyLaunchConfiguration
+      MinSize: '1'
+      MaxSize: '2'
+      TargetGroupARNs:
+        - Ref: MyTargetGroup # Definido com o ALB
+      VPCZoneIdentifier:
+        - !Ref PublicSubnetOne
+        - !Ref PublicSubnetTwo
+      MetricsCollection:
+        - Granularity: "1Minute"
+      Tags:
+        - Key: Project
+          Value: MyProject
+          PropagateAtLaunch: true
+  
+  MyLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - !Ref PublicSubnetOne
+        - !Ref PublicSubnetTwo
+      SecurityGroups:
+        - !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: MyLoadBalancer
+
+  MyTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref MyVPC
+      Protocol: HTTP
+      Port: 5050
+      HealthCheckEnabled: true
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "traffic-port"
+      HealthCheckPath: "/"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: MyTargetGroup
+
+  MyALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyTargetGroup
+      LoadBalancerArn: !Ref MyLoadBalancer
+      Port: 80
+      Protocol: HTTP
+  
+  MyDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: MyApplicationData
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  DynamoDBVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref MyVPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      VpcEndpointType: Interface
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      SubnetIds:
+        - !Ref PublicSubnetOne
+        - !Ref PublicSubnetTwo
+
+  # Política de escalabilidade para aumentar a capacidade
+  ScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref MyAutoScalingGroup
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: 1
+      Cooldown: '20'
+
+  # Política de escalabilidade para diminuir a capacidade
+  ScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref MyAutoScalingGroup
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: -1
+      Cooldown: '20'
+
+  # Alarme para aumentar a capacidade
+  HighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "Alarm if CPU > 1%"
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '60'
+      EvaluationPeriods: '1'
+      Threshold: '1'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref ScaleUpPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref MyAutoScalingGroup
+
+  # Alarme para diminuir a capacidade
+  LowCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "Alarme if CPU < 0.9%"
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '60'
+      EvaluationPeriods: '1'
+      Threshold: '0.9'
+      ComparisonOperator: LessThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref ScaleDownPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref MyAutoScalingGroup
+
+
+
+
+  
