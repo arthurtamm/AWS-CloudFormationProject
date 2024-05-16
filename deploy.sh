@@ -13,16 +13,16 @@ TEMPLATE_FILE=$3
 
 # Obtém o ARN do secret
 SECRET_ARN=$(aws secretsmanager describe-secret --secret-id $SECRET_ID --query 'ARN' --output text)
-TOKEN=$(aws secretsmanager get-secret-value --secret-id \
-    $SECRET_ARN --query 'SecretString' --output text)
+# TOKEN=$(aws secretsmanager get-secret-value --secret-id \
+#     $SECRET_ARN --query 'SecretString' --output text)
 
 # echo "Token1: $TOKEN"
-TOKEN=$(aws secretsmanager get-secret-value --secret-id \
-    $SECRET_ARN --query 'SecretString' --output text)
-echo "TOKEN: $TOKEN"
+# TOKEN=$(aws secretsmanager get-secret-value --secret-id \
+#     $SECRET_ARN --query 'SecretString' --output text)
+# echo "TOKEN: $TOKEN"
 
-GITHUB_TOKEN=$(echo $TOKEN | jq -r '.github_token')
-echo "GitHub Token: $GITHUB_TOKEN"
+# GITHUB_TOKEN=$(echo $TOKEN | jq -r '.github_token')
+# echo "GitHub Token: $GITHUB_TOKEN"
 
 
 
@@ -35,14 +35,14 @@ fi
 # echo "Stack Name: $STACK_NAME"
 
 # Cria ou atualiza a stack
-# if aws cloudformation deploy \
-#     --template-file $TEMPLATE_FILE \
-#     --stack-name $STACK_NAME \
-#     --parameter-overrides SecretsManagerArn=$SECRET_ARN StackName=$STACK_NAME \
-#     --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
-# then
-#     echo "Stack $STACK_NAME atualizada ou criada com sucesso."
-# else
-#     echo "Falha ao atualizar ou criar a stack."
-#     exit 1
-# fi
+if aws cloudformation deploy \
+    --template-file $TEMPLATE_FILE \
+    --stack-name $STACK_NAME \
+    --parameter-overrides SecretsManagerArn=$SECRET_ARN StackName=$STACK_NAME \
+    --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
+then
+    echo "Stack $STACK_NAME atualizada ou criada com sucesso."
+else
+    echo "Falha ao atualizar ou criar a stack."
+    exit 1
+fi

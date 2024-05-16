@@ -1,0 +1,171 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS CloudFormation to provision an infrastructure with ALB, EC2 with Auto Scaling,
+  and DynamoDB for an application.
+
+# Parameters:
+#   StackName:
+#     Description: "Name of the CloudFormation stack"
+#     Type: String
+#   SecretsManagerArn:
+#     Description: "ARN of the Secrets Manager secret"
+#     Type: String
+
+Resources:
+  # Aqui você definirá seus recursos
+
+  MyCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: MyApplicationBuild
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:4.0"
+        ComputeType: BUILD_GENERAL1_SMALL
+        # EnvironmentVariables:
+        #   - Name: AWS_REGION
+        #     Value: "us-east-1"
+        #   - Name: STACK_NAME
+        #     Value: !Ref StackName
+        #   - Name: SECRETS_MANAGER_ARN
+        #     Value: !Ref SecretsManagerArn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - echo "Updating CloudFormation stack..."
+                - aws cloudformation deploy --template-file ./project.yaml --stack-name stack-arthur --parameter-overrides SecretsManagerArn=arn:aws:secretsmanager:us-east-1:192044182094:secret:github-access-token-5ocwpN StackName=stack-arthur --capabilities CAPABILITY_NAMED_IAM
+          artifacts:
+            files:
+              - '**/*'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+  
+  MyCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: MyPipeline
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SrcOutput
+              Configuration:
+                Owner: arthurtamm
+                Repo: AWS-CloudFormationProject
+                Branch: main
+                OAuthToken: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:github_token}}"
+                PollForSourceChanges: false
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SrcOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref MyCodeBuildProject
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [codebuild.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+        - PolicyName: AccessToSecretsManager
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref SecretsManagerArn
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [codepipeline.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: CodePipelinePermissions
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: [
+                  "codebuild:BatchGetBuilds",
+                  "codebuild:StartBuild",
+                  "codedeploy:CreateDeployment",
+                  "codedeploy:GetApplication",
+                  "codedeploy:GetApplicationRevision",
+                  "codedeploy:GetDeployment",
+                  "codedeploy:GetDeploymentConfig",
+                  "codedeploy:RegisterApplicationRevision",
+                  's3:GetObject',
+                  's3:PutObject',
+                  's3:DeleteObject',
+                  's3:ListBucket',
+                  'ecr:GetAuthorizationToken',
+                  'ecr:BatchCheckLayerAvailability',
+                  'ecr:GetDownloadUrlForLayer',
+                  'ecr:GetRepositoryPolicy',
+                  'ecr:DescribeRepositories',
+                  'ecr:ListImages',
+                  'ecr:DescribeImages',
+                  'ecr:BatchGetImage',
+                  'ecr:InitiateLayerUpload',
+                  'ecr:UploadLayerPart',
+                  'ecr:CompleteLayerUpload',
+                  'ecr:PutImage',
+                  'secretsmanager:GetSecretValue'
+                ]
+                Resource: '*'
+        - PolicyName: AccessToSecretsManager
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref SecretsManagerArn
+
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: arthur-pipeline-bucket
+      AccessControl: Private
+
+
+
+
+  
