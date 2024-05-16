@@ -3,13 +3,13 @@ Description: >
   AWS CloudFormation to provision an infrastructure with ALB, EC2 with Auto Scaling,
   and DynamoDB for an application.
 
-# Parameters:
-#   StackName:
-#     Description: "Name of the CloudFormation stack"
-#     Type: String
-#   SecretsManagerArn:
-#     Description: "ARN of the Secrets Manager secret"
-#     Type: String
+Parameters:
+  StackName:
+    Description: "Name of the CloudFormation stack"
+    Type: String
+  SecretsManagerArn:
+    Description: "ARN of the Secrets Manager secret"
+    Type: String
 
 Resources:
   # Aqui você definirá seus recursos
@@ -24,13 +24,13 @@ Resources:
         Type: LINUX_CONTAINER
         Image: "aws/codebuild/standard:4.0"
         ComputeType: BUILD_GENERAL1_SMALL
-        # EnvironmentVariables:
-        #   - Name: AWS_REGION
-        #     Value: "us-east-1"
-        #   - Name: STACK_NAME
-        #     Value: !Ref StackName
-        #   - Name: SECRETS_MANAGER_ARN
-        #     Value: !Ref SecretsManagerArn
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: "us-east-1"
+          - Name: STACK_NAME
+            Value: !Ref StackName
+          - Name: SECRETS_MANAGER_ARN
+            Value: !Ref SecretsManagerArn
       Source:
         Type: CODEPIPELINE
         BuildSpec: |
