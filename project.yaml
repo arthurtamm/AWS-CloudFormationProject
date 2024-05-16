@@ -3,6 +3,14 @@ Description: >
   AWS CloudFormation to provision an infrastructure with ALB, EC2 with Auto Scaling,
   and DynamoDB for an application.
 
+Parameters:
+  StackName:
+    Description: "Name of the CloudFormation stack"
+    Type: String
+  SecretsManagerArn:
+    Description: "ARN of the Secrets Manager secret"
+    Type: String
+
 Resources:
   # Aqui você definirá seus recursos
 
@@ -313,7 +321,7 @@ Resources:
                       user_name = query_components.get('user', [''])[0]
                       if user_name:
                           self.create_user(user_name)
-                      self.send_response(302)
+                      self.send_response(200)
                       self.send_header('Location', '/')
                       self.end_headers()
                   elif self.path.startswith('/list_users'):
@@ -324,12 +332,12 @@ Resources:
                       self.wfile.write(users_html.encode())
                   elif self.path.startswith('/start_stress'):
                       self.start_stress()
-                      self.send_response(302)
+                      self.send_response(200)
                       self.send_header('Location', '/')
                       self.end_headers()
                   elif self.path.startswith('/stop_stress'):
                       self.stop_stress()
-                      self.send_response(302)
+                      self.send_response(200)
                       self.send_header('Location', '/')
                       self.end_headers()
                   else:
@@ -394,7 +402,8 @@ Resources:
     Properties:
       LaunchConfigurationName: !Ref MyLaunchConfiguration
       MinSize: '1'
-      MaxSize: '2'
+      MaxSize: '5'
+      DesiredCapacity: '3'
       TargetGroupARNs:
         - Ref: MyTargetGroup # Definido com o ALB
       VPCZoneIdentifier:
@@ -405,6 +414,9 @@ Resources:
       Tags:
         - Key: Project
           Value: MyProject
+          PropagateAtLaunch: true
+        - Key: Name
+          Value: MyEC2Instances
           PropagateAtLaunch: true
   
   MyLoadBalancer:
@@ -430,7 +442,7 @@ Resources:
       HealthCheckPort: "traffic-port"
       HealthCheckPath: "/"
       HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 10
+      HealthCheckTimeoutSeconds: 20
       HealthyThresholdCount: 3
       UnhealthyThresholdCount: 3
       TargetType: instance
@@ -464,7 +476,7 @@ Resources:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref MyVPC
-      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      ServiceName: !Sub "com.amazonaws.us-east-1.dynamodb"
       VpcEndpointType: Interface
       SecurityGroupIds:
         - !Ref InstanceSecurityGroup
@@ -494,13 +506,13 @@ Resources:
   HighCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: "Alarm if CPU > 1%"
+      AlarmDescription: "Alarm if CPU > 10%"
       MetricName: CPUUtilization
       Namespace: AWS/EC2
       Statistic: Average
       Period: '60'
       EvaluationPeriods: '1'
-      Threshold: '1'
+      Threshold: '10'
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
         - !Ref ScaleUpPolicy
@@ -512,19 +524,234 @@ Resources:
   LowCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: "Alarme if CPU < 0.9%"
+      AlarmDescription: "Alarme if CPU < 0.01%"
       MetricName: CPUUtilization
       Namespace: AWS/EC2
       Statistic: Average
       Period: '60'
       EvaluationPeriods: '1'
-      Threshold: '0.9'
+      Threshold: '0.01'
       ComparisonOperator: LessThanOrEqualToThreshold
       AlarmActions:
         - !Ref ScaleDownPolicy
       Dimensions:
         - Name: AutoScalingGroupName
           Value: !Ref MyAutoScalingGroup
+  
+  MyCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: MyApplicationBuild
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: "aws/codebuild/standard:4.0"
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: "us-east-1"
+          - Name: STACK_NAME
+            Value: !Ref StackName
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - echo "Updating CloudFormation stack..."
+                - aws cloudformation deploy --stack-name $STACK_NAME --template-file ./project.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides file://parameters.json
+          artifacts:
+            files:
+              - '**/*'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+  
+  MyCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: MyPipeline
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SrcOutput
+              Configuration:
+                Owner: arthurtamm
+                Repo: AWS-CloudFormationProject
+                Branch: main
+                OAuthToken: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:github_token}}"
+                PollForSourceChanges: false
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SrcOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref MyCodeBuildProject
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeploy
+              InputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ApplicationName: !Ref MyCodeDeployApplication
+                DeploymentGroupName: !Ref MyCodeDeployDeploymentGroup
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [codebuild.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+        - PolicyName: AccessToSecretsManager
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref SecretsManagerArn
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [codepipeline.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: CodePipelinePermissions
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: [
+                  "codebuild:BatchGetBuilds",
+                  "codebuild:StartBuild",
+                  "codedeploy:CreateDeployment",
+                  "codedeploy:GetApplication",
+                  "codedeploy:GetApplicationRevision",
+                  "codedeploy:GetDeployment",
+                  "codedeploy:GetDeploymentConfig",
+                  "codedeploy:RegisterApplicationRevision",
+                  's3:GetObject',
+                  's3:PutObject',
+                  's3:DeleteObject',
+                  's3:ListBucket',
+                  'ecr:GetAuthorizationToken',
+                  'ecr:BatchCheckLayerAvailability',
+                  'ecr:GetDownloadUrlForLayer',
+                  'ecr:GetRepositoryPolicy',
+                  'ecr:DescribeRepositories',
+                  'ecr:ListImages',
+                  'ecr:DescribeImages',
+                  'ecr:BatchGetImage',
+                  'ecr:InitiateLayerUpload',
+                  'ecr:UploadLayerPart',
+                  'ecr:CompleteLayerUpload',
+                  'ecr:PutImage',
+                  'secretsmanager:GetSecretValue'
+                ]
+                Resource: '*'
+        - PolicyName: AccessToSecretsManager
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref SecretsManagerArn
+
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: arthur-pipeline-bucket
+      AccessControl: Private
+
+  MyCodeDeployApplication:
+    Type: 'AWS::CodeDeploy::Application'
+    Properties:
+      ApplicationName: 'MyApplication'
+      ComputePlatform: 'Server'  # Ou 'Lambda' ou 'ECS', dependendo da sua necessidade
+
+  MyCodeDeployDeploymentGroup:
+    Type: 'AWS::CodeDeploy::DeploymentGroup'
+    Properties:
+      ApplicationName: !Ref MyCodeDeployApplication
+      DeploymentGroupName: 'MyDeploymentGroup'
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn  # Role que dá permissões ao CodeDeploy para agir
+      DeploymentConfigName: !Ref MyCustomDeploymentConfig
+      Ec2TagFilters:
+        - Key: 'Name'
+          Value: 'MyEC2Instances'
+          Type: 'KEY_AND_VALUE'  # Supondo que você esteja implantando em instâncias EC2
+      AutoScalingGroups:
+      - !Ref MyAutoScalingGroup
+      DeploymentStyle:
+        DeploymentType: 'IN_PLACE'
+        DeploymentOption: 'WITH_TRAFFIC_CONTROL'
+      LoadBalancerInfo:
+        TargetGroupInfoList:
+          - Name: !GetAtt MyTargetGroup.TargetGroupName
+
+  MyCustomDeploymentConfig:
+    Type: 'AWS::CodeDeploy::DeploymentConfig'
+    Properties:
+      MinimumHealthyHosts:
+        Type: 'FLEET_PERCENT'
+        Value: 30
+      DeploymentConfigName: 'CustomDeploymentConfiguration'
+
+  CodeDeployServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'codedeploy.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'CodeDeployPermissions'
+          PolicyDocument:
+            Statement:
+              - Effect: 'Allow'
+                Action: '*'
+                Resource: '*'
+
 
 
 
