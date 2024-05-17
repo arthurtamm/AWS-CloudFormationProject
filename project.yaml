@@ -136,10 +136,6 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0 # Permite tráfego HTTP de qualquer lugar; ajuste conforme necessário
         - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0 # Substitua 0.0.0.0/0 pelo seu IP público para maior segurança
-        - IpProtocol: tcp
           FromPort: 5050
           ToPort: 5050
           CidrIp: 0.0.0.0/0
@@ -178,7 +174,7 @@ Resources:
       Roles:
         - Ref: EC2DynamoDBAccessRole
 
-  MyLaunchConfigurationArthur:
+  MyLaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       ImageId: ami-051f8a213df8bc089
@@ -400,7 +396,7 @@ Resources:
   MyAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      LaunchConfigurationName: !Ref MyLaunchConfigurationArthur
+      LaunchConfigurationName: !Ref MyLaunchConfiguration
       MinSize: '1'
       MaxSize: '5'
       DesiredCapacity: '3'

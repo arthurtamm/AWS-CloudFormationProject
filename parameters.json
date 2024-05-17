@@ -1,6 +1,0 @@
-{
-    "Parameters": {
-      "StackName": "stack-arthur",
-      "SecretsManagerArn": "arn:aws:secretsmanager:us-east-1:192044182094:secret:github-access-token-5ocwpN"
-    }
-}
