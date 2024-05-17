@@ -69,7 +69,7 @@ Resources:
                 Repo: AWS-CloudFormationProject
                 Branch: main
                 OAuthToken: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:github_token}}"
-                PollForSourceChanges: false
+                PollForSourceChanges: true
         - Name: Build
           Actions:
             - Name: BuildAction

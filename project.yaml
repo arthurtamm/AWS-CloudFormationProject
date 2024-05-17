@@ -178,7 +178,7 @@ Resources:
       Roles:
         - Ref: EC2DynamoDBAccessRole
 
-  MyLaunchConfiguration-Arthur:
+  MyLaunchConfigurationArthur:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       ImageId: ami-051f8a213df8bc089
