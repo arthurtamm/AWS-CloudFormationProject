@@ -400,7 +400,7 @@ Resources:
   MyAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      LaunchConfigurationName: !Ref MyLaunchConfiguration
+      LaunchConfigurationName: !Ref MyLaunchConfigurationArthur
       MinSize: '1'
       MaxSize: '5'
       DesiredCapacity: '3'
