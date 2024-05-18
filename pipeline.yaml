@@ -3,8 +3,8 @@ Description: >
   Pipeline for managing AWS CloudFormation stack using Github
 
 Parameters:
-  StackName:
-    Description: "Name of the CloudFormation stack"
+  RepositoryName:
+    Description: "Name of the Github repository"
     Type: String
   SecretsManagerArn:
     Description: "ARN of the Secrets Manager secret"
@@ -23,8 +23,6 @@ Resources:
         Image: "aws/codebuild/standard:4.0"
         ComputeType: BUILD_GENERAL1_SMALL
         EnvironmentVariables:
-          - Name: STACK_NAME
-            Value: !Ref StackName
           - Name: SECRETS_MANAGER_ARN
             Value: !Ref SecretsManagerArn
       Source:
@@ -35,7 +33,7 @@ Resources:
             build:
               commands:
                 - echo "Updating CloudFormation stack..."
-                - aws cloudformation deploy --template-file ./project.yaml --stack-name $STACK_NAME --parameter-overrides SecretsManagerArn=$SECRETS_MANAGER_ARN StackName=$STACK_NAME --capabilities CAPABILITY_NAMED_IAM
+                - aws cloudformation deploy --template-file ./project.yaml --stack-name infra-stack --parameter-overrides SecretsManagerArn=$SECRETS_MANAGER_ARN --capabilities CAPABILITY_NAMED_IAM
           artifacts:
             files:
               - '**/*'
@@ -61,10 +59,10 @@ Resources:
               OutputArtifacts:
                 - Name: SrcOutput
               Configuration:
-                Owner: arthurtamm
-                Repo: AWS-CloudFormationProject
-                Branch: main
-                OAuthToken: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:github_token}}"
+                Owner: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:username}}"
+                Repo: CloudFormationProject-Pipeline
+                Branch: master
+                OAuthToken: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:token}}"
                 PollForSourceChanges: true
         - Name: Build
           Actions:

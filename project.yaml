@@ -9,23 +9,23 @@ Parameters:
     Type: String
 
 Resources:
-  # Aqui você definirá seus recursos
-
+  # Virtual Private Cloud configuration
   MyVPC:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/24
-      EnableDnsSupport: true
+      EnableDnsSupport: true  # Enables DNS resolution within the VPC
       Tags:
         - Key: Name
           Value: MyVPC
   
+  # Subnets without public IP addresses
   PublicSubnetOne:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: 10.0.0.0/28
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false  # Prevents assignment of public IP
       AvailabilityZone: "us-east-1a"
       Tags:
         - Key: Name
@@ -36,21 +36,24 @@ Resources:
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: 10.0.0.32/28
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       AvailabilityZone: "us-east-1b"
       Tags:
         - Key: Name
           Value: PublicSubnetTwo
 
+  # Internet Gateway to allow external internet access to the Load Balancer
   MyInternetGateway:
     Type: AWS::EC2::InternetGateway
 
+  # Attaching the Internet Gateway to the VPC
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref MyVPC
       InternetGatewayId: !Ref MyInternetGateway
   
+  # Routing table for directing traffic within the VPC
   MyRouteTable:
     Type: AWS::EC2::RouteTable
     Properties: 
@@ -59,6 +62,7 @@ Resources:
         - Key: Name
           Value: MyRouteTable
 
+  # Route for directing all outbound traffic to the internet
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
@@ -67,6 +71,7 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref MyInternetGateway
 
+  # Associations between subnets and the routing table
   SubnetRouteTableAssociationOne:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -79,49 +84,7 @@ Resources:
       SubnetId: !Ref PublicSubnetTwo
       RouteTableId: !Ref MyRouteTable
   
-  MyNetworkAcl:
-    Type: AWS::EC2::NetworkAcl
-    Properties:
-      VpcId: !Ref MyVPC
-  
-  InboundRule:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref MyNetworkAcl
-      RuleNumber: 100
-      Protocol: -1  # All protocols
-      RuleAction: allow
-      Egress: false
-      CidrBlock: 0.0.0.0/0
-      PortRange:
-        From: 0
-        To: 65535
-  
-  OutboundRule:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref MyNetworkAcl
-      RuleNumber: 100
-      Protocol: -1  # All protocols
-      RuleAction: allow
-      Egress: true
-      CidrBlock: 0.0.0.0/0
-      PortRange:
-        From: 0
-        To: 65535
-  
-  SubnetNetworkAclAssociationOne:
-    Type: AWS::EC2::SubnetNetworkAclAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnetOne
-      NetworkAclId: !Ref MyNetworkAcl
-  
-  SubnetNetworkAclAssociationTwo:
-    Type: AWS::EC2::SubnetNetworkAclAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnetTwo
-      NetworkAclId: !Ref MyNetworkAcl
-
+  # Security group for EC2 instances to restrict traffic from the Load Balancer only
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -129,22 +92,29 @@ Resources:
       VpcId: !Ref MyVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0 # Permite tráfego HTTP de qualquer lugar; ajuste conforme necessário
-        - IpProtocol: tcp
           FromPort: 5050
           ToPort: 5050
-          CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-        - IpProtocol: -1
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: 0.0.0.0/0 # Permite todo o tráfego de saída
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
       Tags:
         - Key: Name
           Value: InstanceSecurityGroup
 
+  # Security group for the Load Balancer allowing HTTP traffic from anywhere
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for load balancer
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: LoadBalancerSecurityGroup
+
+ # IAM role allowing EC2 instances to access DynamoDB
   EC2DynamoDBAccessRole:
     Type: AWS::IAM::Role
     Properties:
@@ -165,20 +135,21 @@ Resources:
                   - "dynamodb:*"
                 Resource: "*"
 
+# IAM instance profile to associate the role with EC2 instances
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
         - Ref: EC2DynamoDBAccessRole
 
+  # Configuration for launching EC2 instances in the Auto Scaling group
   MyLaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      ImageId: ami-051f8a213df8bc089
-      InstanceType: t2.micro # Exemplo de tipo de instância
+      ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}'
+      InstanceType: t2.micro
       SecurityGroups:
         - Ref: InstanceSecurityGroup
-      KeyName: arthurmt-newkey
       IamInstanceProfile: !Ref EC2InstanceProfile
       UserData:
         Fn::Base64: |
@@ -314,7 +285,7 @@ Resources:
                       user_name = query_components.get('user', [''])[0]
                       if user_name:
                           self.create_user(user_name)
-                      self.send_response(200)
+                      self.send_response(302)
                       self.send_header('Location', '/')
                       self.end_headers()
                   elif self.path.startswith('/list_users'):
@@ -390,6 +361,7 @@ Resources:
 
           python3 /home/ec2-user/scripts/dynamodb_app.py &
 
+# Auto Scaling group to manage the scaling and health of instances
   MyAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
@@ -398,7 +370,7 @@ Resources:
       MaxSize: '5'
       DesiredCapacity: '3'
       TargetGroupARNs:
-        - Ref: MyTargetGroup # Definido com o ALB
+        - Ref: MyTargetGroup
       VPCZoneIdentifier:
         - !Ref PublicSubnetOne
         - !Ref PublicSubnetTwo
@@ -412,6 +384,7 @@ Resources:
           Value: MyEC2Instances
           PropagateAtLaunch: true
   
+# Load Balancer to distribute incoming traffic among instances
   MyLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -419,11 +392,12 @@ Resources:
         - !Ref PublicSubnetOne
         - !Ref PublicSubnetTwo
       SecurityGroups:
-        - !Ref InstanceSecurityGroup
+        - !Ref LoadBalancerSecurityGroup
       Tags:
         - Key: Name
           Value: MyLoadBalancer
 
+  # Target group for routing requests to one or more registered targets
   MyTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -443,6 +417,7 @@ Resources:
         - Key: Name
           Value: MyTargetGroup
 
+  # Listener to forward traffic to the target group
   MyALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -453,6 +428,7 @@ Resources:
       Port: 80
       Protocol: HTTP
   
+  # DynamoDB table for application data storage
   MyDynamoDBTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -465,6 +441,7 @@ Resources:
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
 
+  # VPC Endpoint for private DynamoDB access
   DynamoDBVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -477,7 +454,7 @@ Resources:
         - !Ref PublicSubnetOne
         - !Ref PublicSubnetTwo
 
-  # Política de escalabilidade para aumentar a capacidade
+  # Scale-up policy for the Auto Scaling group
   ScaleUpPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
@@ -486,7 +463,7 @@ Resources:
       ScalingAdjustment: 1
       Cooldown: '20'
 
-  # Política de escalabilidade para diminuir a capacidade
+  # Scale-down policy for the Auto Scaling group
   ScaleDownPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
@@ -495,17 +472,17 @@ Resources:
       ScalingAdjustment: -1
       Cooldown: '20'
 
-  # Alarme para aumentar a capacidade
+  # High CPU utilization alarm
   HighCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: "Alarm if CPU > 10%"
+      AlarmDescription: "Alarm if CPU > 5%"
       MetricName: CPUUtilization
       Namespace: AWS/EC2
       Statistic: Average
       Period: '60'
       EvaluationPeriods: '1'
-      Threshold: '10'
+      Threshold: '5'
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
         - !Ref ScaleUpPolicy
@@ -513,11 +490,11 @@ Resources:
         - Name: AutoScalingGroupName
           Value: !Ref MyAutoScalingGroup
 
-  # Alarme para diminuir a capacidade
+  # Low CPU utilization alarm
   LowCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: "Alarme if CPU < 0.01%"
+      AlarmDescription: "Alarm if CPU < 0.01%"
       MetricName: CPUUtilization
       Namespace: AWS/EC2
       Statistic: Average
@@ -530,3 +507,10 @@ Resources:
       Dimensions:
         - Name: AutoScalingGroupName
           Value: !Ref MyAutoScalingGroup
+
+Outputs:
+  LoadBalancerDNS:
+    Description: "The DNS name of the Load Balancer"
+    Value: !GetAtt MyLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-LoadBalancerDNS"

@@ -203,3 +203,5 @@ Quanto ao `Elastic Load Balancing`, é difícil otimizar ainda mais os custos, v
 ## 6. Análise de Carga
 
 A análise de carga foi realizada utilizando a ferramenta `Locust`, que é uma ferramenta de teste de carga de código aberto. O teste foi realizado com 100 usuários virtuais, que acessaram a aplicação em intervalos aleatórios entre 5 e 20 segundos. O teste foi executado por 5 minutos e os resultados podem ser conferidos no arquivo `Load-Test-Analysis.pdf`.
+
+
