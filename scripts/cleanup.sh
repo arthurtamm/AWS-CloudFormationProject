@@ -33,4 +33,10 @@ fi
 echo "Deletando o repositório GitHub..."
 gh repo delete $GIT_USERNAME/$REPO_NAME --confirm
 
+echo "Deletando o repositório local..."
+cd ..
+rm -rf $REPO_NAME
+
 echo "Todos os recursos foram limpos e deletados com sucesso."
+
+

@@ -33,7 +33,7 @@ Resources:
             build:
               commands:
                 - echo "Updating CloudFormation stack..."
-                - aws cloudformation deploy --template-file ./project.yaml --stack-name infra-stack --parameter-overrides SecretsManagerArn=$SECRETS_MANAGER_ARN --capabilities CAPABILITY_NAMED_IAM
+                - aws cloudformation deploy --template-file ./project.yaml --stack-name infra-stack --capabilities CAPABILITY_NAMED_IAM
           artifacts:
             files:
               - '**/*'

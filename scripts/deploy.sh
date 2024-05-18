@@ -74,9 +74,9 @@ else
 fi
 
 # Verifica se o project.yaml está no diretório atual ou um nível acima
-if [ -f "../scripts/project.yaml" ]; then
+if [ -f "../project.yaml" ]; then
   # Move o arquivo para o diretório atual se estiver um nível acima
-  cp ../scripts/project.yaml .
+  cp ../project.yaml .
 fi
 
 # Adicionando project.yaml se ele existir

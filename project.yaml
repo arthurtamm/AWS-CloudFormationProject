@@ -3,10 +3,10 @@ Description: >
   AWS CloudFormation to provision an infrastructure with ALB, EC2 with Auto Scaling,
   and DynamoDB for an application.
 
-Parameters:
-  SecretsManagerArn:
-    Description: "ARN of the Secrets Manager secret"
-    Type: String
+# Parameters:
+#   SecretsManagerArn:
+#     Description: "ARN of the Secrets Manager secret"
+#     Type: String
 
 Resources:
   # Virtual Private Cloud configuration
@@ -25,7 +25,7 @@ Resources:
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: 10.0.0.0/28
-      MapPublicIpOnLaunch: false  # Prevents assignment of public IP
+      MapPublicIpOnLaunch: true  # Prevents assignment of public IP
       AvailabilityZone: "us-east-1a"
       Tags:
         - Key: Name
@@ -36,7 +36,7 @@ Resources:
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: 10.0.0.32/28
-      MapPublicIpOnLaunch: false
+      MapPublicIpOnLaunch: true
       AvailabilityZone: "us-east-1b"
       Tags:
         - Key: Name
@@ -160,7 +160,6 @@ Resources:
           sudo yum update -y
           sudo yum install -y python3 python3-devel
           sudo yum install -y python3-pip
-          sudo yum install -y stress
           sudo python3 -m pip install --upgrade pip
           pip install boto3 jinja2
 
@@ -185,8 +184,6 @@ Resources:
                       <input class="btn" type="submit" value="Create User">
                   </form>
                   <a class="btn" href="/list_users">Show users</a>
-                  <a class="btn" href="/start_stress">Start CPU Stress</a>
-                  <a class="btn" href="/stop_stress">Stop CPU Stress</a>
               </div>
           </body>
           </html>
@@ -294,16 +291,6 @@ Resources:
                       self.end_headers()
                       users_html = self.list_users()
                       self.wfile.write(users_html.encode())
-                  elif self.path.startswith('/start_stress'):
-                      self.start_stress()
-                      self.send_response(200)
-                      self.send_header('Location', '/')
-                      self.end_headers()
-                  elif self.path.startswith('/stop_stress'):
-                      self.stop_stress()
-                      self.send_response(200)
-                      self.send_header('Location', '/')
-                      self.end_headers()
                   else:
                       self.send_response(200)
                       self.send_header('Content-type', 'text/html; charset=utf-8')
@@ -342,14 +329,6 @@ Resources:
                       </html>
                   """)
                   return template.render(users=users)
-
-              def start_stress(self):
-                  # Inicia o processo de stress
-                  subprocess.Popen(['stress', '--cpu', '4', '--timeout', '600'])
-
-              def stop_stress(self):
-                  # Encerra todos os processos de stress
-                  subprocess.call(['pkill', 'stress'])
 
           if __name__ == '__main__':
               server_address = ('', 5050)
