@@ -1,5 +1,17 @@
 # Documentação do Projeto CloudFormation
 
+### Computação em Nuvem - 6º Semestre Engenharia de Computação - Insper
+
+### Arthur Tamm - Maio/2024
+---
+
+## Sumário
+1. [Introdução](#1-introdução)
+2. [Arquitetura da Solução](#2-arquitetura-da-solução)
+3. [Instalação e Configuração](#3-instalação-e-configuração)
+4. [Implementação da Infraestrutura](#4-implementação-da-infraestrutura)
+5. [Análise de Custos](#5-análise-de-custos)
+6. [Análise de Carga](#6-análise-de-carga)
 ## 1. Introdução
 Este projeto implementa uma infraestrutura automatizada usando AWS CloudFormation, que inclui balanceamento de carga com autoscaling, alarmes e uma aplicação básica para testes. Utiliza-se também o AWS CodePipeline para atualizações automáticas baseadas em mudanças no repositório GitHub.
 
@@ -35,6 +47,9 @@ Um grupo de auto scaling (`MyAutoScalingGroup`) gerencia as instâncias EC2, esc
     - **Alarme de Alta Utilização de CPU (HighCPUAlarm)**: Dispara a política de aumento de capacidade quando a utilização da CPU excede um limite definido por um período também pré-definido.
     - **Alarme de Baixa Utilização de CPU (LowCPUAlarm)**: Dispara a política de redução de capacidade quando a utilização da CPU é menor que um limite definido por um período também pré-definido.
 
+    Como a aplicação é leve, p
+    ara visualizar o comportamento do auto scaling, é possível simular a utilização da CPU das instâncias EC2 com a aplicação de carga usando a ferramenta `Locust`. Essa análise é realizada na seção de [Análise de Carga](#6-análise-de-carga).
+
 - **Launch Configuration**:
     - **MyLaunchConfiguration**: Configuração de lançamento que especifica a imagem AMI, o tipo de instância, os grupos de segurança e perfis de IAM necessários para operação das instâncias EC2. Ela também contém um script de inicialização (`UserData`) que automatiza a instalação de software necessário, configurações de sistema e a execução da aplicação ao iniciar a instância. Esta abordagem garante que todas as instâncias sejam padronizadas e prontas para servir a aplicação imediatamente após o lançamento.
 
@@ -64,15 +79,15 @@ Esta arquitetura detalhada proporciona uma base sólida para a aplicação, supo
 
 Para rodar os scripts de criação e deleção da infraestrutura é necessário utilizar um terminal WSL ou distribuições Linux padrão, como Ubuntu.
 
-Para instalar todas as dependências automaticamente, rode o script requirements.sh.
-### 1.Instalando o AWS CLI
+### 1. Dependências
+Para rodar os scripts que gerenciam a infraestrutura, é necessário instalar as seguintes dependências:
+- AWS CLI
+- GitHub CLI
+- xdg-utils (Ubuntu) ou wslu (Windows)
+- jq
+- locust
 
-Execute os seguintes comandos no seu terminal
-```
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-```
+Para garantir que todas as dependências estejam instaladas, execute o script `requirements.sh` no terminal.
 
 ### 2. Configurando o AWS CLI
 Configure suas credenciais e região padrão:
@@ -86,13 +101,7 @@ Você precisará inserir:
 - Default region name (utilizaremos us-east-1)
 - Default output format (pode deixar em branco)
 
-### 3. Instalando o GitHub CLI
-Instale o gh CLI com o seguinte comando:
-```
-sudo apt install gh
-```
-
-### 4. Configurando o GitHub CLI
+### 3. Configurando o GitHub CLI
 Autentifique-se no Github via CLI usando
 
 ```
@@ -114,18 +123,6 @@ Configure seu usuário e email para o Git, se ainda não tiver feito:
 ```
 git config --global user.name "Seu Nome"
 git config --global user.email "seuemail@exemplo.com"
-```
-
-### 6. Possíveis instalações
-Ubuntu:
- ```
-   sudo apt update
-   sudo apt install xdg-utils -y
-```
-Windows:
-```
-sudo apt update
-sudo apt install wslu -y
 ```
 
 ### 7. Permissões AWS
@@ -191,7 +188,7 @@ Para iniciar o deployment, navegue até o diretório do script e execute o coman
 ```
 
 ## 5. Análise de Custos
-A análise de custos da rede foi realizada na calculadora de custos da AWS e pode ser conferida no arquivo `Cost-Analysis-AWSPricingCalculator.pdf`. Os custos são estimados com base na região us-east-1 e podem variar de acordo com a utilização e a região escolhida. A estimativa mensal foi de 54.75 dólares. Entretanto, a aba "Billing" indica uma estimativa mensal de 38 dólares. Isso pode ser fruto de alguma configuração que superestimou o custo, como por exemplo o tamanho dos dados armazenados no DynamoDB.
+A análise de custos da rede foi realizada na calculadora de custos da AWS e pode ser conferida no arquivo `Cost-Analysis-AWSPricingCalculator.pdf`. Os custos são estimados com base na região us-east-1 e podem variar de acordo com a utilização e a região escolhida. A estimativa mensal foi de 58 dólares. Entretanto, a aba "Billing" indica uma estimativa mensal de 45 dólares. Isso pode ser fruto de alguma configuração que superestimou o custo, como por exemplo o tamanho dos dados armazenados no DynamoDB.
 
 ### Principais Custos e Otimizações
 Os principais custos associados a esta infraestrutura foram o `Elastic Load Balancing` e o `Amazon Dynamo DB`.
@@ -202,4 +199,14 @@ Quanto ao `Elastic Load Balancing`, é difícil otimizar ainda mais os custos, v
 
 ## 6. Análise de Carga
 
-A análise de carga foi realizada utilizando a ferramenta `Locust`, que é uma ferramenta de teste de carga de código aberto. O teste foi realizado com 100 usuários virtuais, que acessaram a aplicação em intervalos aleatórios entre 5 e 20 segundos. O teste foi executado por 5 minutos e os resultados podem ser conferidos no arquivo `Load-Test-Analysis.pdf`.
+A análise de carga foi realizada utilizando a ferramenta `Locust`, que é uma ferramenta de teste de carga de código aberto. O teste foi realizado com 100 usuários virtuais, que acessaram a aplicação em intervalos aleatórios entre 1 e 10 segundos. O teste foi executado por 12 minutos e os resultados podem ser conferidos na imagem abaixo.
+
+![Locust](./images/Load-Test-Analysis.png)
+
+
+Para executar o teste de carga, basta rodar o script `locust.sh` no terminal. O script irá iniciar o `Locust` e abrirá automaticamente o navegador padrão para acessar a interface de controle do teste.:
+
+```
+./locust.sh
+```
+Este teste decarga permite visualizar o comportamento do auto scaling, que aumenta ou diminui o número de instâncias EC2 de acordo com a demanda, garantindo que a aplicação mantenha sua performance e disponibilidade.

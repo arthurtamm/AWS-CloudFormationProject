@@ -473,13 +473,13 @@ Resources:
   LowCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: "Alarm if CPU < 0.01%"
+      AlarmDescription: "Alarm if CPU < 0.5%"
       MetricName: CPUUtilization
       Namespace: AWS/EC2
       Statistic: Average
       Period: '60'
       EvaluationPeriods: '1'
-      Threshold: '0.01'
+      Threshold: '0.5'
       ComparisonOperator: LessThanOrEqualToThreshold
       AlarmActions:
         - !Ref ScaleDownPolicy
