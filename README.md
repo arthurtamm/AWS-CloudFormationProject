@@ -12,8 +12,12 @@
 4. [Implementação da Infraestrutura](#4-implementação-da-infraestrutura)
 5. [Análise de Custos](#5-análise-de-custos)
 6. [Análise de Carga](#6-análise-de-carga)
+7. [Integração e Entrega Contínua (CI/CD)](#7-integração-e-entrega-contínua-cicd)
+8. [Referências](#referências)
 ## 1. Introdução
-Este projeto implementa uma infraestrutura automatizada usando AWS CloudFormation, que inclui balanceamento de carga com autoscaling, alarmes e uma aplicação básica para testes. Utiliza-se também o AWS CodePipeline para atualizações automáticas baseadas em mudanças no repositório GitHub.
+Este relatório apresenta a documentação detalhada do projeto de provisionamento de infraestrutura em nuvem utilizando AWS CloudFormation. O objetivo principal do projeto é demonstrar a implementação de uma solução completa, escalável e altamente disponível para uma aplicação web. Através do uso do AWS CloudFormation, é possível automatizar a criação e o gerenciamento de recursos na AWS, garantindo eficiência, consistência e facilidade de replicação da infraestrutura.
+
+A seguir, serão detalhadas a arquitetura da solução proposta, a instalação e configuração necessárias, o processo de implementação da infraestrutura, a análise de custos e a análise de carga. O objetivo é fornecer uma visão completa do projeto, desde a concepção até a execução, incluindo as melhores práticas adotadas para garantir uma infraestrutura robusta e otimizada.
 
 ## 2. Arquitetura da Solução
 A arquitetura deste projeto é projetada para fornecer uma solução robusta, escalável e altamente disponível usando a AWS CloudFormation, que provisiona e gerencia uma infraestrutura completa na nuvem AWS para uma aplicação web. A arquitetura envolve componentes como VPC, sub-redes, gateway de internet, tabelas do DynamoDB, instâncias EC2 com configuração de auto scaling, grupos de segurança e um balanceador de carga. Além disso, incorpora uma pipeline de CI/CD automatizada usando AWS CodePipeline e AWS CodeBuild, conectada a um repositório GitHub para atualizações contínuas da infraestrutura e da aplicação.
@@ -60,11 +64,18 @@ Papéis IAM (`EC2DynamoDBAccessRole`, `CodeBuildServiceRole`, `CodePipelineServi
 Uma tabela DynamoDB (`MyDynamoDBTable`) é usada para armazenar dados da aplicação, configurada para ser acessada de forma eficiente e segura pelas instâncias EC2.
 
 ### 9. AWS CodePipeline e CodeBuild:
-Uma pipeline de integração e entrega contínuas é configurada (`MyCodePipeline`) com um projeto de build (`MyCodeBuildProject`) para automatizar o deployment da infraestrutura e da aplicação sempre que mudanças são feitas no repositório do GitHub.
+Uma pipeline de integração e entrega contínuas é configurada (`MyCodePipeline`) com um projeto de build (`MyCodeBuildProject`) para automatizar o deployment da infraestrutura e da aplicação sempre que mudanças são feitas no repositório do GitHub. Assim, o código da infraestrutura é alocação no repositório do GitHub e, a cada push, a pipeline é acionada, atualizando a stack.
 
-### 10. S3 Bucket:
+### 10. Secrets Manager:
+O AWS Secrets Manager é utilizado para armazenar de forma segura o token de acesso do GitHub necessário para a ação de Source na pipeline de CI/CD.
+
+### 11. S3 Bucket:
 Um bucket S3 (`PipelineArtifactBucket`) é utilizado para armazenar artefatos entre as fases da pipeline.
 
+## Diagrama da Arquitetura
+O diagrama a seguir ilustra a arquitetura da solução proposta.
+
+![Arquitetura da Solução](./images/architectureDiagram.png)
 ## Conectividade e Segurança
 - **VPCEndpoint para DynamoDB**: Um VPC Endpoint é configurado para permitir acesso direto e privado ao DynamoDB a partir da VPC sem necessitar de tráfego pela internet pública, aumentando a segurança e reduzindo a latência.
 
@@ -159,7 +170,7 @@ Antes de executar o script, certifique-se de que as seguintes condições sejam 
 - AWS CLI e GitHub CLI estão instalados e configurados.
 - Credenciais de acesso para AWS e GitHub estão configuradas.
 - Você tem permissões adequadas na AWS para criar e gerenciar recursos CloudFormation, IAM, EC2, etc.
-- O arquivo `project.yaml` deve estar disponível no diretório ou um nível acima do script.
+- O arquivo `project.yaml` e o `pipeline.yaml` devem estar disponíveis no diretório ou um nível acima do script.
 
 ### Passos para Execução
 
@@ -215,3 +226,32 @@ Para executar o teste de carga, basta rodar o script `locust.sh` no terminal. O 
 ./locust.sh
 ```
 Este teste decarga permite visualizar o comportamento do auto scaling, que aumenta ou diminui o número de instâncias EC2 de acordo com a demanda, garantindo que a aplicação mantenha sua performance e disponibilidade.
+
+
+## 7. Integração e Entrega Contínuas (CI/CD)
+
+A implementação de uma pipeline de Integração e Entrega Contínuas (CI/CD) é fundamental para garantir que a infraestrutura e a aplicação web possam ser atualizadas e implantadas de forma automatizada e eficiente. A seguir, será detalhado o funcionamento da pipeline configurada para este projeto, utilizando serviços da AWS, como CodePipeline e CodeBuild, integrados com um repositório do GitHub.
+
+### 7.1. Objetivo da Pipeline
+A pipeline de CI/CD foi criada para automatizar o processo de deploy da infraestrutura e da aplicação, desde a atualização do código no repositório GitHub até a implantação dos recursos na AWS. Este processo envolve várias as etapas de source e build, garantindo que as mudanças sejam testadas e aplicadas de forma consistente e segura.
+
+### 7.2. Estrutura da Pipeline
+A pipeline é composta por dois estágios principais: Source e Build. Cada estágio possui ações específicas que são executadas em sequência, conforme descrito abaixo:
+
+#### 7.2.1. Estágio de Source
+Neste estágio, a pipeline obtém o código fonte do repositório GitHub. A ação de Source utiliza a integração com o GitHub para monitorar o repositório configurado e buscar as últimas alterações no branch principal (master).
+
+#### 7.2.2. Estágio de Build
+Neste estágio, a pipeline utiliza o AWS CodeBuild para executar o processo de build e deploy da infraestrutura. O projeto de build é configurado para usar um ambiente de contêiner Linux padrão e executa comandos especificados em um arquivo buildspec.
+
+### 7.4. Fluxo de Execução
+O fluxo de execução da pipeline pode ser resumido da seguinte forma:
+
+- `Início`: Uma nova alteração é detectada no repositório GitHub configurado.
+- `Source`: A pipeline busca o código fonte atualizado do repositório.
+- `Build`: O CodeBuild executa o processo de build e deploy da infraestrutura utilizando o arquivo buildspec.
+- `Conclusão`: A pipeline verifica o status do build e conclui a execução, notificando sobre o sucesso ou falha.
+
+## 8. Referências
+- [AWS Documentation](https://docs.aws.amazon.com/)
+- [Locust Documentation](https://docs.locust.io/en/stable/)
