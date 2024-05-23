@@ -188,14 +188,18 @@ Para iniciar o deployment, navegue até o diretório do script e execute o coman
 ```
 
 ## 5. Análise de Custos
-A análise de custos da rede foi realizada na calculadora de custos da AWS e pode ser conferida no arquivo `Cost-Analysis-AWSPricingCalculator.pdf`. Os custos são estimados com base na região us-east-1 e podem variar de acordo com a utilização e a região escolhida. A estimativa mensal foi de 58 dólares. Entretanto, a aba "Billing" indica uma estimativa mensal de 45 dólares. Isso pode ser fruto de alguma configuração que superestimou o custo, como por exemplo o tamanho dos dados armazenados no DynamoDB.
+A análise de custos da rede foi realizada na calculadora de custos da AWS e pode ser conferida no arquivo `Cost-Analysis-AWSPricingCalculator.pdf`. Os custos são estimados com base na região us-east-1 e podem variar de acordo com a utilização e a região escolhida. A estimativa mensal foi de USD$52.61 por mês. Entretanto, a aba "Billing" indica uma estimativa mensal de USD$45. Isso é esperado, uma vez que a análise de custos foi realizada pensando na aplicação em uso constante, enquanto a aba "Billing" considera o uso na etapa de desenvolvimento e testes, que é menor.
+
+Além disso, alguns parâmetros foram superestimados por questões de segurança e escalabilidade, como o tamanho do item armazenado e a capacidade de leitura e gravação do DynamoDB.
 
 ### Principais Custos e Otimizações
 Os principais custos associados a esta infraestrutura foram o `Elastic Load Balancing` e o `Amazon Dynamo DB`.
 
+Uma otimização de custos realizada foi a utilização do DynamoDB com o modo `On-Demand`, que cobra apenas pelo uso real, sem taxas fixas. Isso é mais econômico do que o modo `Provisioned`, que cobra uma taxa fixa por capacidade de leitura e gravação, mesmo que não seja totalmente utilizada. Com essa alteração, o custo mensal do DynamoDB foi reduzido de USD$27 para USD$21, e o custo inicial reduziu de USD$180 para USD$0.
+
 Como a aplicação utilizada não requer alto uso de memória, é possível utilizar o free tier do `DynamoDB` que provê 25 GB de armazenamento e 25 unidades de capacidade de gravação e leitura gratuitamente, o que é suficiente para suportar 200 milhões de requests por mês.
 
-Quanto ao `Elastic Load Balancing`, é difícil otimizar ainda mais os custos, visto que as configurações mínimas já foram utilizadas.
+Quanto ao `Elastic Load Balancing`, é difícil otimizar ainda mais os custos, visto que as configurações utilizadas foram próximas das mínimas.
 
 ## 6. Análise de Carga
 
@@ -203,6 +207,7 @@ A análise de carga foi realizada utilizando a ferramenta `Locust`, que é uma f
 
 ![Locust](./images/Load-Test-Analysis.png)
 
+Ao todo foram mais de 11.000 requisições com tempo de resposta médio de 267ms e 0 de falhas, o que indica que a aplicação foi capaz de lidar com a carga de forma eficiente e sem erros.
 
 Para executar o teste de carga, basta rodar o script `locust.sh` no terminal. O script irá iniciar o `Locust` e abrirá automaticamente o navegador padrão para acessar a interface de controle do teste.:
 

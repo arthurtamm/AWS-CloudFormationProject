@@ -347,7 +347,7 @@ Resources:
       LaunchConfigurationName: !Ref MyLaunchConfiguration
       MinSize: '1'
       MaxSize: '5'
-      DesiredCapacity: '3'
+      DesiredCapacity: '2'
       TargetGroupARNs:
         - Ref: MyTargetGroup
       VPCZoneIdentifier:
