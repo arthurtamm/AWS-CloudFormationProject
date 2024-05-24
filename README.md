@@ -105,7 +105,7 @@ Para rodar os scripts que gerenciam a infraestrutura, é necessário instalar as
 
 Caso queira instalar manualmente, siga as instruções abaixo:
 
-#### Ubuntu / WSL
+#### Ubuntu
 
 ```bash
 # Atualize o sistema
@@ -116,6 +116,25 @@ sudo apt install awscli -y
 
 # Instale o xdg-utils
 sudo apt install xdg-utils -y
+
+# Instale o jq
+sudo apt install jq -y
+
+# Instale o Locust
+sudo apt install python3-pip -y
+pip3 install locust
+```
+
+#### WSL
+```bash
+# Atualize o sistema
+sudo apt update
+
+# Instale o AWS CLI
+sudo apt install awscli -y
+
+# Instale o wslu
+sudo apt install wslu -y
 
 # Instale o jq
 sudo apt install jq -y

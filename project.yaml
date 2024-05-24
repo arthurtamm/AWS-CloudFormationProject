@@ -3,11 +3,6 @@ Description: >
   AWS CloudFormation to provision an infrastructure with ALB, EC2 with Auto Scaling,
   and DynamoDB for an application.
 
-# Parameters:
-#   SecretsManagerArn:
-#     Description: "ARN of the Secrets Manager secret"
-#     Type: String
-
 Resources:
   # Virtual Private Cloud configuration
   MyVPC:

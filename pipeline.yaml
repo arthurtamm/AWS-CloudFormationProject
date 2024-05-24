@@ -12,6 +12,7 @@ Parameters:
 
 Resources:
 
+# CodeBuild project to deploy the CloudFormation stack
   MyCodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -38,7 +39,8 @@ Resources:
             files:
               - '**/*'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
-  
+
+# CodePipeline to manage the pipeline 
   MyCodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -79,6 +81,7 @@ Resources:
               Configuration:
                 ProjectName: !Ref MyCodeBuildProject
 
+# IAM roles for CodeBuild and CodePipeline
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -103,6 +106,7 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource: !Ref SecretsManagerArn
 
+# IAM role for CodePipeline
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -135,6 +139,7 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource: !Ref SecretsManagerArn
 
+# S3 bucket to store the pipeline artifacts
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
