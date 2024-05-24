@@ -31,13 +31,6 @@ aws cloudformation wait stack-delete-complete --stack-name pipeline-stack
 # echo "Deletando o bucket S3..."
 # aws s3api delete-bucket --bucket $BUCKET_NAME --region us-east-1
 
-# Obtém e verifica a identidade do Git
-GIT_USERNAME=$(gh api user --jq .login)
-if [ -z "$GIT_USERNAME" ]; then
-  echo "Falha ao recuperar o nome de usuário do GitHub. Verifique a configuração do GH CLI."
-  exit 1
-fi
-
 echo "Todos os recursos foram limpos e deletados com sucesso."
 
 
