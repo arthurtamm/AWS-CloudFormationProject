@@ -26,34 +26,6 @@ else
     echo "AWS CLI já está instalado."
 fi
 
-# Instalação do GitHub CLI
-echo "Instalando GitHub CLI..."
-if ! command -v gh &> /dev/null; then
-    sudo apt install gh -y
-    if command -v gh &> /dev/null; then
-        echo "GitHub CLI instalado com sucesso."
-    else
-        echo "Falha ao instalar GitHub CLI."
-        exit 1
-    fi
-else
-    echo "GitHub CLI já está instalado."
-fi
-
-# Instalação do Git
-echo "Instalando Git..."
-if ! command -v git &> /dev/null; then
-    sudo apt install git -y
-    if command -v git &> /dev/null; then
-        echo "Git instalado com sucesso."
-    else
-        echo "Falha ao instalar Git."
-        exit 1
-    fi
-else
-    echo "Git já está instalado."
-fi
-
 # Instalação do JQ
 echo "Instalando JQ..."
 if ! command -v jq &> /dev/null; then
@@ -116,21 +88,3 @@ else
 fi
 
 echo "Instalações concluídas."
-
-# Configuração interativa do AWS CLI
-# echo "Deseja configurar o AWS CLI agora? (sim/não)"
-# read resposta
-# if [[ "$resposta" == "sim" ]]; then
-#   aws configure
-# else
-#   echo "Você pode configurar o AWS CLI mais tarde executando 'aws configure'."
-# fi
-
-# Configuração interativa do GitHub CLI
-# echo "Deseja fazer login no GitHub CLI agora? (sim/não)"
-# read resposta
-# if [[ "$resposta" == "sim" ]]; then
-#   gh auth login
-# else
-#   echo "Você pode fazer login no GitHub CLI mais tarde executando 'gh auth login'."
-# fi

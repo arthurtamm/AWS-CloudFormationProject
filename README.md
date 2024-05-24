@@ -95,10 +95,10 @@ Para rodar os scripts de criação e deleção da infraestrutura é necessário 
 ### 1. Dependências
 Para rodar os scripts que gerenciam a infraestrutura, é necessário instalar as seguintes dependências:
 - AWS CLI
-- GitHub CLI
 - xdg-utils (Ubuntu) ou wslu (Windows)
 - jq
 - locust
+
 ### Instalando as dependências
 
 É possível instalar todas as dependências executando o script `requirements.sh` no terminal.
@@ -114,15 +114,6 @@ sudo apt update
 # Instale o AWS CLI
 sudo apt install awscli -y
 
-# Instale o GitHub CLI
-type -p curl >/dev/null || sudo apt install curl -y
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-
-sudo apt update
-sudo apt install gh -y
-
 # Instale o xdg-utils
 sudo apt install xdg-utils -y
 
@@ -134,43 +125,13 @@ sudo apt install python3-pip -y
 pip3 install locust
 ```
 
-### 2. Configurando o AWS CLI
-Configure suas credenciais e região padrão:
-```
-aws configure
-```
-Você precisará inserir:
+### 2. Fork do Repositório
+Para utilizar a pipeline de CI/CD, é necessário fazer um fork deste repositório no GitHub. Isso permitirá que você faça alterações no código e acione a pipeline para atualizar a infraestrutura e a aplicação.
 
-- AWS Access Key ID
-- AWS Secret Access Key
-- Default region name (utilizaremos us-east-1)
-- Default output format (pode deixar em branco)
+- Faça login no GitHub e acesse o repositório [AWS-CloudFormationProject](https://github.com/arthurtamm/CloudFormationProject-Pipeline)
+- Clique no botão "Fork" no canto superior direito da página para criar uma cópia do repositório na sua conta.
 
-### 3. Configurando o GitHub CLI
-Autentifique-se no Github via CLI usando
-
-```
-gh auth login
-```
-Siga as instruções na tela para autenticar, escolhendo HTTPS como método de conexão e autenticando através de um token.
-
-O token utilizado para se autenticar precisará ter os seguinte escopos:
-- repo
-- workflow
-- read:org
-- user
-- delete_repo
-
-Se já tiver um token, é possível atualizar os escopos. Caso contrário, será necessário criar um token https://github.com/settings/tokens
-
-### 5. Configuração Geral do Git
-Configure seu usuário e email para o Git, se ainda não tiver feito:
-```
-git config --global user.name "Seu Nome"
-git config --global user.email "seuemail@exemplo.com"
-```
-
-### 7. Permissões AWS
+### 3. Permissões AWS
 Para implementar a infraestrutura proposta, é necessário adicionar permissões a sua conta AWS.
 
 #### Permissões IAM necessárias:
@@ -184,7 +145,7 @@ Para implementar a infraestrutura proposta, é necessário adicionar permissões
 - IAMFullAccess
 - SecretsManagerReadWrite
 
-### 8. Criando AWS Secret Manager
+### 4. Criando AWS Secret Manager
 Para criar um segredo no AWS Secrets Manager que contém um usuário e um token, você pode seguir os seguintes passos. Isso é útil para armazenar de forma segura informações sensíveis, como credenciais de API ou tokens de acesso, que seu aplicativo ou scripts precisam acessar.
 
 Rode o comando:
@@ -201,7 +162,7 @@ Esta seção descreve o processo para iniciar a infraestrutura utilizando o scri
 
 Antes de executar o script, certifique-se de que as seguintes condições sejam atendidas:
 
-- AWS CLI e GitHub CLI estão instalados e configurados.
+- AWS CLI está instalado e configurado.
 - Credenciais de acesso para AWS e GitHub estão configuradas.
 - Você tem permissões adequadas na AWS para criar e gerenciar recursos CloudFormation, IAM, EC2, etc.
 - O arquivo `project.yaml` e o `pipeline.yaml` devem estar disponíveis no diretório um nível acima do script `deploy.sh`.
@@ -210,26 +171,34 @@ Antes de executar o script, certifique-se de que as seguintes condições sejam 
 
 1. **Definição do Secret Name**: O script espera um nome de segredo `github-access-token` que deve ser previamente configurado no AWS Secrets Manager.
 
-2. **Obtenção da Identidade Git**: O script usa a GitHub CLI para obter o nome de usuário e email do Git configurados na sua máquina. Certifique-se de que esses dados estejam corretamente configurados para evitar falhas.
+2. **Fork do Repositório**: O script solicita o nome do fork do repositório. Isso é necessário para configurar a pipeline de CI/CD.
 
-3. **Criação e Configuração do Repositório GitHub**: Se o repositório especificado não existir, ele será criado e clonado. Caso contrário, o script garante que o repositório local esteja sincronizado com o GitHub.
+3. **Deployment da Stack CloudFormation**: Utilizando o AWS CLI, o script faz o deploy da stack `pipeline-stack` com base no arquivo `pipeline.yaml`. Se o arquivo não estiver no caminho especificado, o script falhará.
 
-4. **Adição do Arquivo de Projeto**: O script verifica a existência do `project.yaml` e o adiciona ao repositório Git, se encontrado.
+4. **Monitoramento do Pipeline**: O script aguarda até que a execução do pipeline seja concluída, lidando com possíveis estados de execução como sucesso, falha, ou parada.
 
-5. **Deployment da Stack CloudFormation**: Utilizando o AWS CLI, o script faz o deploy da stack `pipeline-stack` com base no arquivo `pipeline.yaml`. Se o arquivo não estiver no caminho especificado, o script falhará.
+5. **Deployment da Infraestrutura**: Após o sucesso do pipeline, a stack da infraestrutura é deployada.
 
-6. **Monitoramento do Pipeline**: O script aguarda até que a execução do pipeline seja concluída, lidando com possíveis estados de execução como sucesso, falha, ou parada.
-
-7. **Deployment da Infraestrutura**: Após o sucesso do pipeline, a stack da infraestrutura é deployada.
-
-8. **Acesso à Aplicação**: No final do script, a URL da aplicação é exibida e aberta automaticamente no navegador padrão do sistema operacional.
+6. **Acesso à Aplicação**: No final do script, a URL da aplicação é exibida e aberta automaticamente no navegador padrão do sistema operacional.
 
 ### Executando o Script
 
-Para iniciar o deployment, navegue até o diretório do script e execute o comando:
+Para iniciar o deployment, execute o comando no diretório raiz do projeto:
 
 ```
-./deploy.sh
+./scripts/deploy.sh nome-do-fork-do-repositório
+```
+
+Aguarde a execução do script e verifique se a infraestrutura foi criada com sucesso. A URL da aplicação será aberta automaticamente no navegador padrão.
+
+### Atualização da Infraestrutura
+Para atualizar a infraestrutura, basta fazer alterações no código e fazer um push para o repositório da pipeline. A pipeline de CI/CD será acionada automaticamente, atualizando a stack da infraestrutura.
+
+### Deletando a Infraestrutura
+Para deletar a infraestrutura, execute o script `cleanup.sh` no diretório raiz do projeto:
+
+```
+./scripts/cleanup.sh nome-do-fork-do-repositório
 ```
 
 ## 5. Análise de Custos
@@ -257,7 +226,7 @@ Ao todo foram mais de 11.000 requisições com tempo de resposta médio de 267ms
 Para executar o teste de carga, basta rodar o script `locust.sh` no terminal. O script irá iniciar o `Locust` e abrirá automaticamente o navegador padrão para acessar a interface de controle do teste:
 
 ```
-./locust.sh
+./scripts/locust.sh
 ```
 Este teste decarga permite visualizar o comportamento do auto scaling, que aumenta ou diminui o número de instâncias EC2 de acordo com a demanda, garantindo que a aplicação mantenha sua performance e disponibilidade.
 

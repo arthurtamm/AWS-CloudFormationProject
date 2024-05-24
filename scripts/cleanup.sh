@@ -1,9 +1,17 @@
 #!/bin/bash
 
 # Nome do repositório e informações do bucket
-REPO_NAME="CloudFormationProject-Pipeline"
 BUCKET_NAME="arthur-pipeline-bucket"
 SECRET_NAME="github-access-token"
+
+# Check if repo name is provided
+if [ -z "$1" ]
+then
+  echo "Please provide the repository name as a parameter."
+  exit 1
+fi
+
+REPO_NAME=$1
 
 echo "Limpando o bucket S3..."
 aws s3 rm s3://$BUCKET_NAME --recursive
@@ -29,13 +37,6 @@ if [ -z "$GIT_USERNAME" ]; then
   echo "Falha ao recuperar o nome de usuário do GitHub. Verifique a configuração do GH CLI."
   exit 1
 fi
-
-echo "Deletando o repositório GitHub..."
-gh repo delete $GIT_USERNAME/$REPO_NAME --confirm
-
-echo "Deletando o repositório local..."
-cd ..
-rm -rf $REPO_NAME
 
 echo "Todos os recursos foram limpos e deletados com sucesso."
 

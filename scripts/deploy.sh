@@ -3,10 +3,16 @@
 # Parâmetro esperado
 SECRET_NAME="github-access-token"
 
-# Obtém e verifica a identidade do Git
-GIT_USERNAME=$(gh api user --jq .login)
-GIT_EMAIL=$(gh api user/emails --jq '.[] | select(.primary==true) | .email')
 PIPELINE_NAME="MyPipeline"
+
+# Check if repo name is provided
+if [ -z "$1" ]
+then
+  echo "Please provide the repository name as a parameter."
+  exit 1
+fi
+
+REPO_NAME=$1
 
 # Função para obter o estado da última execução do pipeline
 get_latest_pipeline_execution_status() {
@@ -46,48 +52,6 @@ wait_for_pipeline_completion() {
     done
 }
 
-if [ -z "$GIT_USERNAME" ] || [ -z "$GIT_EMAIL" ]; then
-  echo "Git user name and email are not set."
-  echo "Run the following commands to set them:"
-  echo "git config --global user.name \"Your Name\""
-  echo "git config --global user.email \"you@example.com\""
-  exit 1
-fi
-
-cd ..
-
-# Criando o repositório no GitHub e clonando
-REPO_NAME="CloudFormationProject-Pipeline"
-
-# Verifica se o diretório do repositório já existe
-if [ ! -d "$REPO_NAME" ]; then
-  gh repo create $REPO_NAME --private --clone
-  cd $REPO_NAME
-else
-  echo "Repositório já clonado."
-  cd $REPO_NAME
-  # Configura o branch upstream se não estiver configurado
-  git remote add origin https://github.com/$GIT_USERNAME/$REPO_NAME.git
-  git fetch --all
-  git branch --set-upstream-to=origin/master master
-  git pull origin master
-fi
-
-# Verifica se o project.yaml está no diretório atual ou um nível acima
-if [ -f "../project.yaml" ]; then
-  # Move o arquivo para o diretório atual se estiver um nível acima
-  cp ../project.yaml .
-fi
-
-# Adicionando project.yaml se ele existir
-if [ -f "project.yaml" ]; then
-  git add project.yaml
-  git commit -m "Add CloudFormation project.yaml."
-  git push origin master
-else
-  echo "Arquivo project.yaml não encontrado."
-fi
-
 # Buscando o ARN do segredo no AWS Secrets Manager
 SECRET_ARN=$(aws secretsmanager describe-secret --secret-id $SECRET_NAME --query 'ARN' --output text)
 if [ -z "$SECRET_ARN" ]; then
@@ -95,7 +59,7 @@ if [ -z "$SECRET_ARN" ]; then
   exit 1
 fi
 
-cd ..
+# cd ..
 
 echo "Deploying the pipeline stack..." 
 

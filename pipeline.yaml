@@ -61,7 +61,7 @@ Resources:
               Configuration:
                 Owner: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:username}}"
                 Repo: CloudFormationProject-Pipeline
-                Branch: master
+                Branch: main
                 OAuthToken: !Sub "{{resolve:secretsmanager:${SecretsManagerArn}:SecretString:token}}"
                 PollForSourceChanges: true
         - Name: Build
@@ -120,12 +120,6 @@ Resources:
                 Action: [
                   "codebuild:BatchGetBuilds",
                   "codebuild:StartBuild",
-                  "codedeploy:CreateDeployment",
-                  "codedeploy:GetApplication",
-                  "codedeploy:GetApplicationRevision",
-                  "codedeploy:GetDeployment",
-                  "codedeploy:GetDeploymentConfig",
-                  "codedeploy:RegisterApplicationRevision",
                   's3:GetObject',
                   's3:PutObject',
                   's3:DeleteObject',
