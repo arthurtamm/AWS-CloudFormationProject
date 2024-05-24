@@ -143,10 +143,5 @@ Resources:
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: arthur-pipeline-bucket
+      BucketName: arthur-pipeline-bucket42
       AccessControl: Private
-
-
-
-
-  

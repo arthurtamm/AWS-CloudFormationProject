@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Nome do repositório e informações do bucket
-BUCKET_NAME="arthur-pipeline-bucket"
+BUCKET_NAME="arthur-pipeline-bucket42"
 SECRET_NAME="github-access-token"
 
 # Check if repo name is provided
