@@ -109,3 +109,5 @@ case "$OSTYPE" in
     echo "Please open the following URL in your web browser: $URL"
     ;;
 esac
+
+echo "Access in: http://$URL"
