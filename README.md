@@ -13,7 +13,8 @@
 5. [Análise de Custos](#5-análise-de-custos)
 6. [Análise de Carga](#6-análise-de-carga)
 7. [Integração e Entrega Contínua (CI/CD)](#7-integração-e-entrega-contínua-cicd)
-8. [Referências](#referências)
+8. [Referências](#8-referências)
+
 ## 1. Introdução
 Este relatório apresenta a documentação detalhada do projeto de provisionamento de infraestrutura em nuvem utilizando AWS CloudFormation. O objetivo principal do projeto é demonstrar a implementação de uma solução completa, escalável e altamente disponível para uma aplicação web. Através do uso do AWS CloudFormation, é possível automatizar a criação e o gerenciamento de recursos na AWS, garantindo eficiência, consistência e facilidade de replicação da infraestrutura.
 
@@ -34,8 +35,8 @@ Um Internet Gateway (`MyInternetGateway`) é associado à VPC para permitir aces
 
 ### 4. Security Groups:
 Dois grupos de segurança são criados:
-  - `LoadBalancerSecurityGroup`: Permite tráfego HTTP de entrada em qualquer lugar para o balanceador de carga.
-  - `InstanceSecurityGroup`: Permite tráfego na porta 5050 apenas do balanceador de carga, protegendo as instâncias EC2.
+  - `LoadBalancerSecurityGroup`: Permite tráfego HTTP de entrada em qualquer lugar para o load balancer.
+  - `InstanceSecurityGroup`: Permite tráfego na porta 5050 apenas do load balancer, protegendo as instâncias EC2.
 
 ### 5. Elastic Load Balancing (ALB):
 Um Application Load Balancer (`MyLoadBalancer`) é configurado para distribuir o tráfego entre as instâncias EC2 dentro das subnets privadas. Um ouvinte (`MyALBListener`) é configurado para encaminhar o tráfego para um grupo de destino (`MyTargetGroup`).
@@ -72,10 +73,6 @@ O AWS Secrets Manager é utilizado para armazenar de forma segura o token de ace
 ### 11. S3 Bucket:
 Um bucket S3 (`PipelineArtifactBucket`) é utilizado para armazenar artefatos entre as fases da pipeline.
 
-## Diagrama da Arquitetura
-O diagrama a seguir ilustra a arquitetura da solução proposta.
-
-![Arquitetura da Solução](./images/architectureDiagram.png)
 ## Conectividade e Segurança
 - **VPCEndpoint para DynamoDB**: Um VPC Endpoint é configurado para permitir acesso direto e privado ao DynamoDB a partir da VPC sem necessitar de tráfego pela internet pública, aumentando a segurança e reduzindo a latência.
 
@@ -85,6 +82,11 @@ O diagrama a seguir ilustra a arquitetura da solução proposta.
 - A infraestrutura de CI/CD permite uma integração contínua das mudanças no código e na infraestrutura, promovendo um ciclo de vida de desenvolvimento ágil e a entrega rápida de melhorias e novas funcionalidades para a aplicação.
 
 Esta arquitetura detalhada proporciona uma base sólida para a aplicação, suportando escalabilidade, segurança e alta disponibilidade, essenciais para operações críticas e de grande volume na AWS.
+
+## Diagrama da Arquitetura
+O diagrama a seguir ilustra a arquitetura da solução proposta.
+
+![Arquitetura da Solução](./images/architectureDiagram.png)
 
 ## 3. Instalação e Configuração
 
@@ -97,8 +99,40 @@ Para rodar os scripts que gerenciam a infraestrutura, é necessário instalar as
 - xdg-utils (Ubuntu) ou wslu (Windows)
 - jq
 - locust
+### Instalando as dependências
 
-Para garantir que todas as dependências estejam instaladas, execute o script `requirements.sh` no terminal.
+É possível instalar todas as dependências executando o script `requirements.sh` no terminal.
+
+Caso queira instalar manualmente, siga as instruções abaixo:
+
+#### Ubuntu / WSL
+
+```bash
+# Atualize o sistema
+sudo apt update
+
+# Instale o AWS CLI
+sudo apt install awscli -y
+
+# Instale o GitHub CLI
+type -p curl >/dev/null || sudo apt install curl -y
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+sudo apt update
+sudo apt install gh -y
+
+# Instale o xdg-utils
+sudo apt install xdg-utils -y
+
+# Instale o jq
+sudo apt install jq -y
+
+# Instale o Locust
+sudo apt install python3-pip -y
+pip3 install locust
+```
 
 ### 2. Configurando o AWS CLI
 Configure suas credenciais e região padrão:
@@ -170,7 +204,7 @@ Antes de executar o script, certifique-se de que as seguintes condições sejam 
 - AWS CLI e GitHub CLI estão instalados e configurados.
 - Credenciais de acesso para AWS e GitHub estão configuradas.
 - Você tem permissões adequadas na AWS para criar e gerenciar recursos CloudFormation, IAM, EC2, etc.
-- O arquivo `project.yaml` e o `pipeline.yaml` devem estar disponíveis no diretório ou um nível acima do script.
+- O arquivo `project.yaml` e o `pipeline.yaml` devem estar disponíveis no diretório um nível acima do script `deploy.sh`.
 
 ### Passos para Execução
 
@@ -220,7 +254,7 @@ A análise de carga foi realizada utilizando a ferramenta `Locust`, que é uma f
 
 Ao todo foram mais de 11.000 requisições com tempo de resposta médio de 267ms e 0 de falhas, o que indica que a aplicação foi capaz de lidar com a carga de forma eficiente e sem erros.
 
-Para executar o teste de carga, basta rodar o script `locust.sh` no terminal. O script irá iniciar o `Locust` e abrirá automaticamente o navegador padrão para acessar a interface de controle do teste.:
+Para executar o teste de carga, basta rodar o script `locust.sh` no terminal. O script irá iniciar o `Locust` e abrirá automaticamente o navegador padrão para acessar a interface de controle do teste:
 
 ```
 ./locust.sh
@@ -228,7 +262,7 @@ Para executar o teste de carga, basta rodar o script `locust.sh` no terminal. O 
 Este teste decarga permite visualizar o comportamento do auto scaling, que aumenta ou diminui o número de instâncias EC2 de acordo com a demanda, garantindo que a aplicação mantenha sua performance e disponibilidade.
 
 
-## 7. Integração e Entrega Contínuas (CI/CD)
+## 7. Integração e Entrega Contínua (CI/CD)
 
 A implementação de uma pipeline de Integração e Entrega Contínuas (CI/CD) é fundamental para garantir que a infraestrutura e a aplicação web possam ser atualizadas e implantadas de forma automatizada e eficiente. A seguir, será detalhado o funcionamento da pipeline configurada para este projeto, utilizando serviços da AWS, como CodePipeline e CodeBuild, integrados com um repositório do GitHub.
 
